@@ -35,76 +35,66 @@ function BarChart({ series }: { series: GananciasMonth[] }) {
   }
 
   const chartHeight = 180;
-  const groupWidth = 64;
-  const barWidth = 20;
-  const barGap = 8;
-  const padding = 12;
-  const width = series.length * groupWidth + padding * 2;
+  const slot = 100 / series.length;
+  const barWidth = slot * 0.36;
+  const groupPad = slot * 0.12;
   const maxValue = Math.max(
     ...series.flatMap((item) => [item.academix, item.sidor]),
     1,
   );
 
   return (
-    <div className="overflow-x-auto">
-      <svg
-        viewBox={`0 0 ${width} ${chartHeight + 32}`}
-        width={width}
-        height={chartHeight + 32}
-        role="img"
-        aria-label="Gráfico de barras de ingresos por mes"
-      >
-        {series.map((item, index) => {
-          const x = padding + index * groupWidth;
-          const academixHeight = (item.academix / maxValue) * chartHeight;
-          const sidorHeight = (item.sidor / maxValue) * chartHeight;
-          return (
-            <g key={item.mes}>
-              <rect
-                x={x}
-                y={chartHeight - academixHeight}
-                width={barWidth}
-                height={academixHeight}
-                rx={4}
-                className="text-primary"
-                fill="currentColor"
-              >
-                <title>{`${item.mes} · Academix: ${formatCurrency(item.academix)}`}</title>
-              </rect>
-              <rect
-                x={x + barWidth + barGap}
-                y={chartHeight - sidorHeight}
-                width={barWidth}
-                height={sidorHeight}
-                rx={4}
-                className="text-secondary"
-                fill="currentColor"
-              >
-                <title>{`${item.mes} · Sidor: ${formatCurrency(item.sidor)}`}</title>
-              </rect>
-              <g className="text-muted" fill="currentColor">
-                <text
-                  x={x + barWidth + barGap / 2}
-                  y={chartHeight + 16}
-                  textAnchor="middle"
-                  fontSize={11}
-                >
-                  {item.mes.slice(0, 3)}
-                </text>
-                <text
-                  x={x + barWidth + barGap / 2}
-                  y={chartHeight + 28}
-                  textAnchor="middle"
-                  fontSize={9}
-                >
-                  {formatCurrency(item.total)}
-                </text>
-              </g>
-            </g>
-          );
-        })}
-      </svg>
-    </div>
+    <svg
+      width="100%"
+      height={chartHeight + 24}
+      role="img"
+      aria-label="Gráfico de barras de ingresos por mes"
+      className="block"
+    >
+      {series.map((item, index) => {
+        const academixHeight = (item.academix / maxValue) * chartHeight;
+        const sidorHeight = (item.sidor / maxValue) * chartHeight;
+        const academixX = index * slot + groupPad;
+        const sidorX = index * slot + slot - groupPad - barWidth;
+        const centerX = index * slot + slot / 2;
+        return (
+          <g key={item.mes}>
+            <rect
+              x={`${academixX}%`}
+              y={chartHeight - academixHeight}
+              width={`${barWidth}%`}
+              height={academixHeight}
+              rx={4}
+              className="text-primary"
+              fill="currentColor"
+            >
+              <title>{`${item.mes} · Academix: ${formatCurrency(item.academix)}`}</title>
+            </rect>
+            <rect
+              x={`${sidorX}%`}
+              y={chartHeight - sidorHeight}
+              width={`${barWidth}%`}
+              height={sidorHeight}
+              rx={4}
+              className="text-secondary"
+              fill="currentColor"
+            >
+              <title>{`${item.mes} · Sidor: ${formatCurrency(item.sidor)}`}</title>
+            </rect>
+            <text
+              x={`${centerX}%`}
+              y={chartHeight + 16}
+              textAnchor="middle"
+              fontSize={11}
+              className="text-muted"
+              fill="currentColor"
+            >
+              {item.mes.slice(0, 3)}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -136,10 +126,9 @@ function PieChart({
     <div className="flex flex-col items-center gap-6">
       <svg
         viewBox="0 0 100 100"
-        width={170}
-        height={170}
         role="img"
         aria-label="Gráfico circular de Academix contra Sidor"
+        className="mx-auto h-auto w-full max-w-[190px]"
       >
         <circle
           cx={50}
