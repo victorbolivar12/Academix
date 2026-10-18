@@ -1,0 +1,127 @@
+
+> academix-site-admin@0.1.0 dev
+> next dev
+
+▲ Next.js 16.4.2 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.100:3000
+✓ Ready in 2.9s
+✓ Running next.config.ts took 198ms
+- Cache Components enabled
+- Partial Prefetching enabled
+
+○ Compiling / ...
+ GET / 200 in 1747ms (next.js: 932ms, application-code: 815ms)
+ GET / 200 in 575ms (next.js: 12ms, application-code: 563ms)
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.tsx">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <RootLayout>
+                        <html
+                          lang="es"
+                          className="poppins_e09e6dc8-module__Gt3Q-a__variable h-full antialiased"
+-                         suppresshydrationwarning="true"
+-                         data-lt-installed="true"
+                        >
+                  ...
+ 
+ GET / 200 in 205ms (next.js: 4ms, application-code: 201ms)
+ GET /_next%2Fstatic%2Fchunks%2F%5Broot-of-the-server%5D__07vs7cchtug8-._.css 404 in 2.4s (next.js: 2.3s, application-code: 168ms)
+ GET / 200 in 191ms (next.js: 6ms, application-code: 185ms)
+ GET / 200 in 135ms (next.js: 3ms, application-code: 132ms)
+ GET / 200 in 1143ms (next.js: 18ms, application-code: 1125ms)
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.tsx">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <RootLayout>
+                        <html
+                          lang="es"
+                          className="poppins_e09e6dc8-module__Gt3Q-a__variable h-full antialiased"
+-                         suppresshydrationwarning="true"
+-                         data-lt-installed="true"
+                        >
+                  ...
+ 
+✓ Compiled in 1523ms
+✓ Finished writing to filesystem cache in 19.0s
+○ Compiling / ...
+✓ Finished writing to filesystem cache in 13.6s
+⚠ [next]/internal/font/google/poppins_e09e6dc8.module.css
+Warning: Error while requesting resource
+There was an issue establishing a connection while requesting https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap
+
+Import trace:
+  Server Component:
+    [next]/internal/font/google/poppins_e09e6dc8.module.css
+    [next]/internal/font/google/poppins_e09e6dc8.js
+    ./src/app/layout.tsx
+
+
+⚠ [next]/internal/font/google/poppins_e09e6dc8.module.css
+Warning: next/font: warning:
+Failed to download Poppins from Google Fonts. Using a fallback font instead.
+If you are offline or behind a proxy, self-host the font with next/font/local, or set HTTP_PROXY/HTTPS_PROXY so Next.js can reach fonts.googleapis.com.
+
+Import trace:
+  Server Component:
+    [next]/internal/font/google/poppins_e09e6dc8.module.css
+    [next]/internal/font/google/poppins_e09e6dc8.js
+    ./src/app/layout.tsx
+
+
+ GET / 200 in 585ms (next.js: 94ms, application-code: 491ms)
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\pc\\Documents\\Academix-Site-Admin\\.opencode\\node_modules\\@opencode-ai\\sdk\\dist\\client.js").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (1.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\pc\\Documents\\Academix-Site-Admin\\.opencode\\node_modules\\find-my-way-ts\\dist\\cjs\\QueryString.js").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (3.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\pc\\Documents\\Academix-Site-Admin\\.opencode\\node_modules\\@opencode-ai\\sdk\\dist\\gen\\client\\types.gen.js").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\pc\\Documents\\Academix-Site-Admin\\.opencode\\node_modules\\fast-check\\lib\\fast-check.d.ts").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (1.6s elapsed so far; last modified: "\\\\?\\C:\\Users\\pc\\Documents\\Academix-Site-Admin\\.opencode\\node_modules\\msgpackr\\dist\\index.js.map").
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (3.6s elapsed so far; last modified: "\\\\?\\C:\\Users\\pc\\Documents\\Academix-Site-Admin\\.opencode\\node_modules\\uuid\\README.md").
+[?25h

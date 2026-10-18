@@ -1,0 +1,9 @@
+@theme {
+  --color-primary: #0d1b3d;
+  --color-secondary: #10b981;
+  --color-accent: #fbbf24;
+  --color-surface: #f2f4f7;
+  --color-muted: #6b7280;
+
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+}
