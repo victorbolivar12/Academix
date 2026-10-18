@@ -9,7 +9,10 @@ export interface AcademixRecordInput {
   estado: string;
   estado_pago: string;
 }
-export function buildMesCondition(mes: string | null): {
+export function buildMesCondition(
+  mes: string | null,
+  column = "mes_registro",
+): {
   clause: string;
   params: DbParam[];
 } {
@@ -19,11 +22,11 @@ export function buildMesCondition(mes: string | null): {
   if (match) {
     const monthName = SPANISH_MONTHS[Number(match[2]) - 1];
     return {
-      clause: "(mes_registro = ? OR mes_registro = ? OR mes_registro = ?)",
+      clause: `(${column} = ? OR ${column} = ? OR ${column} = ?)`,
       params: [mes, `${monthName} ${match[1]}`, monthName],
     };
   }
-  return { clause: "mes_registro = ?", params: [mes] };
+  return { clause: `${column} = ?`, params: [mes] };
 }
 
 export type ParseRecordResult =

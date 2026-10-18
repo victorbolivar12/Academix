@@ -23,3 +23,31 @@ export interface AcademixListResponse {
   monthCount: number;
   stats: AcademixStats;
 }
+
+export interface SidorPago {
+  id: number;
+  titulo: string;
+  monto: string;
+  mes: string;
+  fecha_pago: string;
+}
+
+export interface SidorListResponse {
+  records: SidorPago[];
+  months: string[];
+  monthCount: number;
+  monthTotal: number;
+}
+
+export interface GananciasMonth {
+  mes: string;
+  academix: number;
+  sidor: number;
+  total: number;
+}
+
+export interface GananciasResponse {
+  months: string[];
+  series: GananciasMonth[];
+  selected: GananciasMonth;
+}

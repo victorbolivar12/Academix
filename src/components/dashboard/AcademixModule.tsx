@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { parseAcademixMessage } from "@/lib/academix";
-import { SPANISH_MONTHS } from "@/lib/months";
+import {
+  emptySubscribe,
+  formatCurrency,
+  formatDeliveryDate,
+  formatMonth,
+  getCurrentMonth,
+  getEmptyValue,
+} from "@/lib/format";
 import type { AcademixListResponse, AcademixRecord, AcademixStats } from "@/lib/types";
-
-const currencyFormatter = new Intl.NumberFormat("es-MX", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
 
 const inputClass =
   "w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm font-normal text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-secondary/40";
@@ -41,68 +43,6 @@ const initialForm: FormState = {
   estado: "Pendiente",
   estado_pago: "Pendiente",
 };
-
-function formatCurrency(value: number): string {
-  return `$${currencyFormatter.format(value)}`;
-}
-
-function getCurrentMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function subscribe(): () => void {
-  return () => {};
-}
-
-function getServerMonth(): string {
-  return "";
-}
-
-function formatMonth(mes: string): string {
-  const match = /^(\d{4})-(\d{2})$/.exec(mes);
-  if (!match) return mes;
-  const monthName = SPANISH_MONTHS[Number(match[2]) - 1];
-  return monthName ? `${monthName} ${match[1]}` : mes;
-}
-
-const SPANISH_WEEKDAYS = [
-  "domingo",
-  "lunes",
-  "martes",
-  "miércoles",
-  "jueves",
-  "viernes",
-  "sábado",
-];
-
-function getWeekdayName(year: number, month: number, day: number): string {
-  const adjustedMonth = month < 3 ? month + 12 : month;
-  const adjustedYear = month < 3 ? year - 1 : year;
-  const century = Math.floor(adjustedYear / 100);
-  const yearOfCentury = adjustedYear % 100;
-  const h =
-    (day +
-      Math.floor((13 * (adjustedMonth + 1)) / 5) +
-      yearOfCentury +
-      Math.floor(yearOfCentury / 4) +
-      Math.floor(century / 4) +
-      5 * century) %
-    7;
-  const index = (h + 6) % 7;
-  return SPANISH_WEEKDAYS[index];
-}
-
-function formatDeliveryDate(value: string | null): string {
-  if (!value) return "—";
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  if (!match) return value;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const weekday = getWeekdayName(year, month, day);
-  return `${match[3]}/${match[2]}/${match[1]} · ${weekday}`;
-}
 
 function formatStatus(value: string | null): {
   label: string;
@@ -352,9 +292,9 @@ export default function AcademixModule() {
   const [error, setError] = useState<string | null>(null);
 
   const currentMonth = useSyncExternalStore(
-    subscribe,
+    emptySubscribe,
     getCurrentMonth,
-    getServerMonth,
+    getEmptyValue,
   );
   const [mesFilter, setMesFilter] = useState<string | undefined>(undefined);
   const mes = mesFilter ?? currentMonth;
