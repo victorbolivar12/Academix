@@ -6,6 +6,7 @@ import Sidebar from "./Sidebar";
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -25,7 +26,36 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         />
       )}
 
-      <Sidebar open={open} onNavigate={() => setOpen(false)} />
+      <Sidebar
+        open={open}
+        collapsed={collapsed}
+        onNavigate={() => setOpen(false)}
+        onCollapse={() => setCollapsed(true)}
+      />
+
+      {collapsed && (
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          aria-label="Mostrar menú"
+          className="fixed left-4 top-4 z-30 hidden h-10 w-10 items-center justify-center rounded-xl border border-black/5 bg-white text-primary shadow-sm transition-colors hover:bg-surface lg:flex"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-5 w-5"
+            aria-hidden="true"
+          >
+            <path d="M4 6h16" />
+            <path d="M4 12h16" />
+            <path d="M4 18h16" />
+          </svg>
+        </button>
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-black/5 bg-white px-4 py-3 lg:hidden">
@@ -61,7 +91,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           </button>
         </header>
 
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+        <main
+          className={`flex-1 ${
+            collapsed
+              ? "px-4 py-6 sm:px-6 lg:py-8 lg:pl-16"
+              : "px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+          }`}
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

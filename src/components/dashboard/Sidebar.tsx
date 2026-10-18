@@ -65,17 +65,24 @@ const modules = [
 
 interface SidebarProps {
   open: boolean;
+  collapsed: boolean;
   onNavigate: () => void;
+  onCollapse: () => void;
 }
 
-export default function Sidebar({ open, onNavigate }: SidebarProps) {
+export default function Sidebar({
+  open,
+  collapsed,
+  onNavigate,
+  onCollapse,
+}: SidebarProps) {
   const pathname = usePathname();
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r border-black/5 bg-primary text-white transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 ${
-        open ? "translate-x-0" : "-translate-x-full"
-      }`}
+      className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r border-black/5 bg-primary text-white transition-transform duration-200 lg:static lg:z-auto ${
+        collapsed ? "lg:hidden" : "lg:translate-x-0"
+      } ${open ? "translate-x-0" : "-translate-x-full"}`}
     >
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
         <Link
@@ -85,25 +92,46 @@ export default function Sidebar({ open, onNavigate }: SidebarProps) {
         >
           Acadexia<span className="text-secondary">.</span>
         </Link>
-        <button
-          type="button"
-          onClick={onNavigate}
-          aria-label="Cerrar menú"
-          className="flex h-9 w-9 items-center justify-center rounded-xl text-white/70 transition-colors hover:bg-white/5 hover:text-white lg:hidden"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-5 w-5"
-            aria-hidden="true"
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onCollapse}
+            aria-label="Ocultar menú"
+            className="hidden h-9 w-9 items-center justify-center rounded-xl text-white/70 transition-colors hover:bg-white/5 hover:text-white lg:flex"
           >
-            <path d="M6 6l12 12M18 6 6 18" />
-          </svg>
-        </button>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-5 w-5"
+              aria-hidden="true"
+            >
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={onNavigate}
+            aria-label="Cerrar menú"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-white/70 transition-colors hover:bg-white/5 hover:text-white lg:hidden"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-5 w-5"
+              aria-hidden="true"
+            >
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-4 py-6">
