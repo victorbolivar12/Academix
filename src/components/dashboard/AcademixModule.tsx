@@ -229,7 +229,13 @@ async function copyToClipboard(value: string): Promise<boolean> {
   }
 }
 
-function CopyCodeButton({ value }: { value: string }) {
+function CopyCodeButton({
+  value,
+  label = "código",
+}: {
+  value: string;
+  label?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -243,8 +249,8 @@ function CopyCodeButton({ value }: { value: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      aria-label="Copiar código"
-      title={copied ? "Copiado" : "Copiar código"}
+      aria-label={`Copiar ${label}`}
+      title={copied ? "Copiado" : `Copiar ${label}`}
       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors ${
         copied
           ? "text-secondary"
@@ -543,21 +549,25 @@ export default function AcademixModule() {
       label: "Acumulado",
       value: formatCurrency(stats.acumulado),
       description: "Entregados con pago pendiente",
+      copyText: `Balance: ${formatCurrency(stats.acumulado)}`,
     },
     {
       label: "Ganancia",
       value: formatCurrency(stats.ganancia),
       description: "Acumulado menos 25%",
+      copyText: null,
     },
     {
       label: "Total de Academia",
       value: formatCurrency(stats.totalAcademia),
       description: "Entregados y pagados",
+      copyText: null,
     },
     {
       label: "Total de Ganancia",
       value: formatCurrency(stats.totalGanancia),
       description: "Total de Academia menos 25%",
+      copyText: null,
     },
   ];
 
@@ -595,7 +605,12 @@ export default function AcademixModule() {
             className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm"
           >
             <p className="text-sm font-normal text-muted">{card.label}</p>
-            <p className="mt-3 text-2xl font-bold text-primary">{card.value}</p>
+            <p className="mt-3 flex items-center gap-2 text-2xl font-bold text-primary">
+              {card.value}
+              {card.copyText && (
+                <CopyCodeButton value={card.copyText} label="balance" />
+              )}
+            </p>
             <p className="mt-1 text-xs font-normal text-muted">{card.description}</p>
           </article>
         ))}

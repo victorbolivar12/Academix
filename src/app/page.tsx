@@ -35,7 +35,7 @@ export default function Home() {
         </p>
         <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row">
           <Link
-            href="/dashboard"
+            href="/dashboard/ganancias"
             className="rounded-full bg-secondary px-6 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
           >
             Comenzar
