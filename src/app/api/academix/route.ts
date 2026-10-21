@@ -53,8 +53,8 @@ export async function GET(request: Request) {
     const { where, params } = buildConditions(searchParams);
 
     const records = await dbQuery<AcademixRecord>(
-      `SELECT id, codigo, titulo, fecha_entrega_real, precio, porcentaje,
-              estado, estado_pago, mes_registro
+      `SELECT id, codigo, titulo, fecha_entrega_real, hora, comentario, precio,
+              porcentaje, estado, estado_pago, mes_registro
        FROM registros_trabajos
        ${where}
        ORDER BY fecha_entrega_real DESC, id DESC`,
@@ -124,12 +124,14 @@ export async function POST(request: Request) {
 
     const result = await dbExecute(
       `INSERT INTO registros_trabajos
-         (codigo, titulo, fecha_entrega_real, precio, porcentaje, estado, estado_pago, mes_registro)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (codigo, titulo, fecha_entrega_real, hora, comentario, precio, porcentaje, estado, estado_pago, mes_registro)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         value.codigo,
         value.titulo,
         value.fecha_entrega_real,
+        value.hora,
+        value.comentario,
         value.precio,
         value.precio * 0.75,
         value.estado,

@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { CopyCodeButton } from "@/components/dashboard/CopyCodeButton";
+import { RecordDetailModal } from "@/components/dashboard/RecordDetailModal";
 import { parseAcademixMessage } from "@/lib/academix";
 import {
   emptySubscribe,
   formatCurrency,
   formatDeliveryDate,
   formatMonth,
+  formatStatus,
   getCurrentMonth,
   getEmptyValue,
 } from "@/lib/format";
@@ -30,6 +33,8 @@ interface FormState {
   codigo: string;
   titulo: string;
   fecha_entrega_real: string;
+  hora: string;
+  comentario: string;
   precio: string;
   estado: string;
   estado_pago: string;
@@ -39,28 +44,12 @@ const initialForm: FormState = {
   codigo: "",
   titulo: "",
   fecha_entrega_real: "",
+  hora: "",
+  comentario: "",
   precio: "",
   estado: "Pendiente",
   estado_pago: "Pendiente",
 };
-
-function formatStatus(value: string | null): {
-  label: string;
-  className: string;
-} {
-  if (!value) {
-    return { label: "—", className: "bg-surface text-muted" };
-  }
-  const normalized = value.toLowerCase();
-  const label = value.charAt(0).toUpperCase() + value.slice(1);
-  if (normalized === "listo") {
-    return { label, className: "bg-secondary/10 text-secondary" };
-  }
-  if (normalized === "pendiente") {
-    return { label, className: "bg-accent/20 text-primary" };
-  }
-  return { label, className: "bg-primary/10 text-primary" };
-}
 
 interface RecordActionsProps {
   estado: string | null;
@@ -85,7 +74,10 @@ function RecordActions({
   const pagoIsListo = (estadoPago ?? "").toLowerCase() === "listo";
 
   return (
-    <div className="flex shrink-0 items-center gap-1">
+    <div
+      className="flex shrink-0 items-center gap-1"
+      onClick={(event) => event.stopPropagation()}
+    >
       <button
         type="button"
         onClick={onToggleEstado}
@@ -203,89 +195,25 @@ function RecordActions({
   );
 }
 
-async function copyToClipboard(value: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(value);
-      return true;
-    }
-  } catch {
-    // continúa con el método alternativo
-  }
-
-  try {
-    const textarea = document.createElement("textarea");
-    textarea.value = value;
-    textarea.setAttribute("readonly", "");
-    textarea.style.position = "fixed";
-    textarea.style.opacity = "0";
-    document.body.appendChild(textarea);
-    textarea.select();
-    const copied = document.execCommand("copy");
-    document.body.removeChild(textarea);
-    return copied;
-  } catch {
-    return false;
-  }
-}
-
-function CopyCodeButton({
-  value,
-  label = "código",
+function SelectCheckbox({
+  checked,
+  onToggle,
+  label,
 }: {
-  value: string;
-  label?: string;
+  checked: boolean;
+  onToggle: () => void;
+  label: string;
 }) {
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy() {
-    const ok = await copyToClipboard(value);
-    if (!ok) return;
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
-  }
-
   return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      aria-label={`Copiar ${label}`}
-      title={copied ? "Copiado" : `Copiar ${label}`}
-      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors ${
-        copied
-          ? "text-secondary"
-          : "text-muted hover:bg-surface hover:text-primary"
-      }`}
-    >
-      {copied ? (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-3.5 w-3.5"
-          aria-hidden="true"
-        >
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
-      ) : (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-4 w-4"
-          aria-hidden="true"
-        >
-          <rect x="9" y="9" width="13" height="13" rx="2" />
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
-      )}
-    </button>
+    <input
+      type="checkbox"
+      aria-label={label}
+      title={label}
+      checked={checked}
+      onClick={(event) => event.stopPropagation()}
+      onChange={onToggle}
+      className="h-4 w-4 cursor-pointer accent-secondary"
+    />
   );
 }
 
@@ -326,6 +254,12 @@ export default function AcademixModule() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const [detailRecord, setDetailRecord] = useState<AcademixRecord | null>(
+    null,
+  );
+
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -343,6 +277,11 @@ export default function AcademixModule() {
       setMonths(data.months);
       setMonthCount(data.monthCount);
       setStats(data.stats);
+      setSelectedIds((previous) =>
+        previous.filter((id) =>
+          data.records.some((record) => record.id === id),
+        ),
+      );
       setError(null);
     } catch {
       setError("Error al cargar los datos de Academix");
@@ -371,6 +310,17 @@ export default function AcademixModule() {
   const porcentajePreview =
     Number.isFinite(precioNumber) && precioNumber >= 0 ? precioNumber * 0.75 : 0;
 
+  const selectedRecords = records.filter((record) =>
+    selectedIds.includes(record.id),
+  );
+  const selectedPorcentajeTotal = selectedRecords.reduce(
+    (total, record) => total + Number(record.porcentaje ?? 0),
+    0,
+  );
+  const allVisibleSelected =
+    visibleRecords.length > 0 &&
+    visibleRecords.every((record) => selectedIds.includes(record.id));
+
   function openForm() {
     setForm(initialForm);
     setFormError(null);
@@ -385,6 +335,8 @@ export default function AcademixModule() {
       codigo: record.codigo ?? "",
       titulo: record.titulo ?? "",
       fecha_entrega_real: record.fecha_entrega_real ?? "",
+      hora: record.hora ?? "",
+      comentario: record.comentario ?? "",
       precio: record.precio ?? "",
       estado: record.estado || "Pendiente",
       estado_pago: record.estado_pago || "Pendiente",
@@ -399,13 +351,45 @@ export default function AcademixModule() {
     setEditingId(null);
   }
 
+  function openDetail(record: AcademixRecord) {
+    setDetailRecord(record);
+  }
+
+  function closeDetail() {
+    setDetailRecord(null);
+  }
+
+  function toggleSelected(recordId: number) {
+    setSelectedIds((previous) =>
+      previous.includes(recordId)
+        ? previous.filter((id) => id !== recordId)
+        : [...previous, recordId],
+    );
+  }
+
+  function toggleAllVisible() {
+    const visibleIds = visibleRecords.map((record) => record.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+    setSelectedIds((previous) =>
+      allSelected
+        ? previous.filter((id) => !visibleIds.includes(id))
+        : Array.from(new Set([...previous, ...visibleIds])),
+    );
+  }
+
+  function clearSelection() {
+    setSelectedIds([]);
+  }
+
   function handleParseMessage() {
     const parsed = parseAcademixMessage(message);
     if (
       !parsed.titulo &&
       !parsed.codigo &&
       !parsed.precio &&
-      !parsed.fecha_entrega_real
+      !parsed.fecha_entrega_real &&
+      !parsed.hora &&
+      !parsed.comentario
     ) {
       setMessageError("No se reconocieron datos en el mensaje");
       return;
@@ -414,6 +398,8 @@ export default function AcademixModule() {
       codigo: parsed.codigo ?? "",
       titulo: parsed.titulo ?? "",
       fecha_entrega_real: parsed.fecha_entrega_real ?? "",
+      hora: parsed.hora ?? "",
+      comentario: parsed.comentario ?? "",
       precio: parsed.precio ?? "",
       estado: form.estado,
       estado_pago: form.estado_pago,
@@ -524,6 +510,8 @@ export default function AcademixModule() {
             codigo: form.codigo,
             titulo: form.titulo,
             fecha_entrega_real: form.fecha_entrega_real,
+            hora: form.hora,
+            comentario: form.comentario,
             precio: precioNumber,
             estado: form.estado,
             estado_pago: form.estado_pago,
@@ -738,6 +726,27 @@ export default function AcademixModule() {
             {payMessage}
           </p>
         )}
+        {selectedIds.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 bg-accent/10 px-6 py-3">
+            <p className="text-sm font-normal text-primary">
+              <span className="font-bold">{selectedIds.length}</span>{" "}
+              {selectedIds.length === 1
+                ? "registro seleccionado"
+                : "registros seleccionados"}{" "}
+              · Suma de porcentaje{" "}
+              <span className="font-bold text-secondary">
+                {formatCurrency(selectedPorcentajeTotal)}
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="rounded-full border border-primary/15 px-4 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-white"
+            >
+              Limpiar selección
+            </button>
+          </div>
+        )}
 
         <div className="divide-y divide-black/5 lg:hidden">
           {visibleRecords.length === 0 && !loading ? (
@@ -749,10 +758,19 @@ export default function AcademixModule() {
               const estado = formatStatus(record.estado);
               const estadoPago = formatStatus(record.estado_pago);
               return (
-                <article key={record.id} className="px-4 py-4">
+                <article
+                  key={record.id}
+                  onClick={() => openDetail(record)}
+                  className="cursor-pointer px-4 py-4 transition-colors hover:bg-surface/60"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1">
+                        <SelectCheckbox
+                          checked={selectedIds.includes(record.id)}
+                          onToggle={() => toggleSelected(record.id)}
+                          label={`Seleccionar ${record.titulo ?? "registro"}`}
+                        />
                         <span className="truncate text-xs font-normal text-muted">
                           {record.codigo || "Sin código"}
                         </span>
@@ -820,6 +838,12 @@ export default function AcademixModule() {
                       </dd>
                     </div>
                     <div>
+                      <dt className="text-xs font-normal text-muted">Hora</dt>
+                      <dd className="text-sm font-normal text-primary">
+                        {record.hora || "—"}
+                      </dd>
+                    </div>
+                    <div>
                       <dt className="text-xs font-normal text-muted">
                         Mes de registro
                       </dt>
@@ -838,9 +862,17 @@ export default function AcademixModule() {
           <table className="w-full min-w-[900px] text-left text-sm font-normal">
             <thead>
               <tr className="border-b border-black/5 text-muted">
+                <th className="w-10 px-4 py-3 font-bold">
+                  <SelectCheckbox
+                    checked={allVisibleSelected}
+                    onToggle={toggleAllVisible}
+                    label="Seleccionar todos los registros visibles"
+                  />
+                </th>
                 <th className="px-4 py-3 font-bold">Código</th>
                 <th className="px-4 py-3 font-bold">Título</th>
                 <th className="px-4 py-3 font-bold">Fecha de entrega</th>
+                <th className="px-4 py-3 font-bold">Hora</th>
                 <th className="px-4 py-3 font-bold">Precio</th>
                 <th className="px-4 py-3 font-bold">Porcentaje</th>
                 <th className="px-4 py-3 font-bold">Estado</th>
@@ -852,7 +884,7 @@ export default function AcademixModule() {
               {records.length === 0 && !loading ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={10}
                     className="px-4 py-8 text-center text-muted"
                   >
                     No hay registros para los filtros seleccionados
@@ -865,8 +897,16 @@ export default function AcademixModule() {
                   return (
                     <tr
                       key={record.id}
-                      className="border-b border-black/5 last:border-0"
+                      onClick={() => openDetail(record)}
+                      className="cursor-pointer border-b border-black/5 transition-colors last:border-0 hover:bg-surface/60"
                     >
+                      <td className="px-4 py-3">
+                        <SelectCheckbox
+                          checked={selectedIds.includes(record.id)}
+                          onToggle={() => toggleSelected(record.id)}
+                          label={`Seleccionar ${record.titulo ?? "registro"}`}
+                        />
+                      </td>
                       <td className="px-4 py-3 text-muted">
                         {record.codigo ? (
                           <span className="flex items-center gap-1">
@@ -881,6 +921,7 @@ export default function AcademixModule() {
                       <td className="px-4 py-3 text-muted">
                         {formatDeliveryDate(record.fecha_entrega_real)}
                       </td>
+                      <td className="px-4 py-3 text-muted">{record.hora || "—"}</td>
                       <td className="px-4 py-3 font-bold text-primary">
                         {formatCurrency(Number(record.precio ?? 0))}
                       </td>
@@ -1002,13 +1043,13 @@ export default function AcademixModule() {
                       setMessageError(null);
                     }}
                     placeholder={
-                      "Agendado 🤝 tarea\nValor: 8$\nFecha: 19/10\nHora: 5pm\nCódigo: 191026vbt-13 ✅"
+                      "Agendado 🤝 tarea 2\nValor: 8$\nFecha: 21/10\nHora: 5pm\nCódigo:  211026vbt-15  ✅"
                     }
                     className={`${inputClass} resize-y`}
                   />
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs font-normal text-muted">
-                      Se completan título, valor, fecha y código.
+                      Se completan título, valor, fecha, hora, código y comentario.
                     </p>
                     <button
                       type="button"
@@ -1058,24 +1099,22 @@ export default function AcademixModule() {
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="form-titulo" className={labelClass}>
-                  Título
-                </label>
-                <input
-                  id="form-titulo"
-                  type="text"
-                  value={form.titulo}
-                  onChange={(event) =>
-                    setForm({ ...form, titulo: event.target.value })
-                  }
-                  placeholder="Nombre del trabajo"
-                  required
-                  className={inputClass}
-                />
-              </div>
-
               <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="form-hora" className={labelClass}>
+                    Hora (opcional)
+                  </label>
+                  <input
+                    id="form-hora"
+                    type="text"
+                    value={form.hora}
+                    onChange={(event) =>
+                      setForm({ ...form, hora: event.target.value })
+                    }
+                    placeholder="Ej. 5pm"
+                    className={inputClass}
+                  />
+                </div>
                 <div>
                   <label htmlFor="form-precio" className={labelClass}>
                     Precio
@@ -1093,9 +1132,7 @@ export default function AcademixModule() {
                     required
                     className={inputClass}
                   />
-                </div>
-                <div>
-                  <label htmlFor="form-porcentaje" className={labelClass}>
+                  <label htmlFor="form-porcentaje" className={`${labelClass} mt-4`}>
                     Porcentaje (precio − 25%)
                   </label>
                   <input
@@ -1106,6 +1143,23 @@ export default function AcademixModule() {
                     className={`${inputClass} cursor-not-allowed bg-surface text-muted`}
                   />
                 </div>
+              </div>
+
+              <div>
+                <label htmlFor="form-titulo" className={labelClass}>
+                  Título
+                </label>
+                <input
+                  id="form-titulo"
+                  type="text"
+                  value={form.titulo}
+                  onChange={(event) =>
+                    setForm({ ...form, titulo: event.target.value })
+                  }
+                  placeholder="Nombre del trabajo"
+                  required
+                  className={inputClass}
+                />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1144,6 +1198,22 @@ export default function AcademixModule() {
                 </div>
               </div>
 
+              <div>
+                <label htmlFor="form-comentario" className={labelClass}>
+                  Comentario (opcional)
+                </label>
+                <textarea
+                  id="form-comentario"
+                  rows={3}
+                  value={form.comentario}
+                  onChange={(event) =>
+                    setForm({ ...form, comentario: event.target.value })
+                  }
+                  placeholder="Notas del trabajo"
+                  className={`${inputClass} resize-y`}
+                />
+              </div>
+
               {formError && (
                 <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-normal text-red-700">
                   {formError}
@@ -1174,6 +1244,12 @@ export default function AcademixModule() {
           </div>
         </div>
       )}
+
+      <RecordDetailModal
+        record={detailRecord}
+        onClose={closeDetail}
+        onEdit={openEdit}
+      />
 
       {deletingRecord && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

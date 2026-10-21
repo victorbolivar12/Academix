@@ -5,6 +5,8 @@ export interface AcademixRecordInput {
   codigo: string | null;
   titulo: string;
   fecha_entrega_real: string | null;
+  hora: string | null;
+  comentario: string | null;
   precio: number;
   estado: string;
   estado_pago: string;
@@ -38,7 +40,7 @@ export function parseRecordInput(body: unknown): ParseRecordResult {
     return { ok: false, error: "Datos no válidos" };
   }
 
-  const { codigo, titulo, fecha_entrega_real, precio, estado, estado_pago } =
+  const { codigo, titulo, fecha_entrega_real, hora, comentario, precio, estado, estado_pago } =
     body as Record<string, unknown>;
 
   if (!titulo || typeof titulo !== "string" || !titulo.trim()) {
@@ -63,6 +65,12 @@ export function parseRecordInput(body: unknown): ParseRecordResult {
         typeof fecha_entrega_real === "string" && fecha_entrega_real
           ? fecha_entrega_real
           : null,
+      hora:
+        typeof hora === "string" && hora.trim() ? hora.trim() : null,
+      comentario:
+        typeof comentario === "string" && comentario.trim()
+          ? comentario.trim()
+          : null,
       precio: precioNumber,
       estado:
         typeof estado === "string" && estado.trim() ? estado.trim() : "Pendiente",
@@ -79,6 +87,8 @@ export interface ParsedAcademixMessage {
   codigo: string | null;
   precio: string | null;
   fecha_entrega_real: string | null;
+  hora: string | null;
+  comentario: string | null;
 }
 
 const EMOJI_PATTERN = /\p{Extended_Pictographic}|\uFE0F|\u200D/gu;
@@ -132,37 +142,62 @@ function parseDate(value: string): string | null {
   return null;
 }
 
+const FIELD_KEYS = "valor|precio|fecha|hora|c[oó]digo|comentario|nota|n[uú]mero";
+const FIELD_PATTERN = new RegExp(`\\b(${FIELD_KEYS})\\s*:\\s*`, "gi");
+
 export function parseAcademixMessage(text: string): ParsedAcademixMessage {
   const result: ParsedAcademixMessage = {
     titulo: null,
     codigo: null,
     precio: null,
     fecha_entrega_real: null,
+    hora: null,
+    comentario: null,
   };
 
   const titleParts: string[] = [];
+
+  const applyField = (rawKey: string, rawValue: string) => {
+    const key = rawKey.toLowerCase();
+    const value = cleanValue(rawValue);
+    if (!value) return;
+
+    if (key === "valor" || key === "precio") {
+      const amount = parseAmount(value);
+      if (amount !== null) result.precio = amount;
+    } else if (key === "fecha") {
+      const date = parseDate(value);
+      if (date !== null) result.fecha_entrega_real = date;
+    } else if (key === "hora") {
+      result.hora = value.toLowerCase();
+    } else if (key === "código" || key === "codigo") {
+      result.codigo = value;
+    } else if (key === "comentario" || key === "nota") {
+      result.comentario = value;
+    }
+  };
 
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line) continue;
 
-    const match = /^(valor|precio|fecha|hora|c[oó]digo|n[uú]mero)\s*:\s*(.*)$/i.exec(line);
-    if (match) {
-      const key = match[1].toLowerCase();
-      const value = cleanValue(match[2]);
-
-      if (key === "valor" || key === "precio") {
-        result.precio = parseAmount(value);
-      } else if (key === "fecha") {
-        result.fecha_entrega_real = parseDate(value);
-      } else if (key === "código" || key === "codigo") {
-        result.codigo = value || null;
-      }
+    const matches = [...line.matchAll(FIELD_PATTERN)];
+    if (matches.length === 0) {
+      const titlePart = cleanValue(line);
+      if (titlePart) titleParts.push(titlePart);
       continue;
     }
 
-    const titlePart = cleanValue(line);
-    if (titlePart) titleParts.push(titlePart);
+    const firstIndex = matches[0].index ?? 0;
+    const leadingTitle = cleanValue(line.slice(0, firstIndex));
+    if (leadingTitle) titleParts.push(leadingTitle);
+
+    matches.forEach((match, index) => {
+      const nextMatch = matches[index + 1];
+      const valueStart = (match.index ?? 0) + match[0].length;
+      const valueEnd = nextMatch ? (nextMatch.index ?? line.length) : line.length;
+      applyField(match[1], line.slice(valueStart, valueEnd));
+    });
   }
 
   const titulo = titleParts.join(" ").trim();

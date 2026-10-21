@@ -1,13 +1,32 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { RecordDetailModal } from "@/components/dashboard/RecordDetailModal";
 import {
   emptySubscribe,
   formatCurrency,
+  formatDeliveryDate,
+  formatStatus,
   getCurrentMonthName,
   getEmptyValue,
+  getTodayIso,
 } from "@/lib/format";
-import type { GananciasMonth, GananciasResponse } from "@/lib/types";
+import {
+  getNextReminderDelay,
+  getLastNotificationDate,
+  getNotificationState,
+  isReminderTimePassed,
+  requestNotificationPermission,
+  setLastNotificationDate,
+  showWorkNotification,
+  type NotificationState,
+} from "@/lib/notifications";
+import type {
+  AcademixListResponse,
+  AcademixRecord,
+  GananciasMonth,
+  GananciasResponse,
+} from "@/lib/types";
 
 const inputClass =
   "w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm font-normal text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-secondary/40";
@@ -217,6 +236,25 @@ export default function GananciasModule() {
   const [mesFilter, setMesFilter] = useState<string | undefined>(undefined);
   const mes = mesFilter ?? currentMonth;
 
+  const [detailRecord, setDetailRecord] = useState<AcademixRecord | null>(null);
+
+  const [summaryFecha, setSummaryFecha] = useState<string | undefined>(undefined);
+  const todayIso = useSyncExternalStore(emptySubscribe, getTodayIso, getEmptyValue);
+  const summaryDate = summaryFecha ?? todayIso;
+  const [summaryRecords, setSummaryRecords] = useState<AcademixRecord[]>([]);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+
+  const [notificationMessage, setNotificationMessage] = useState<string | null>(
+    null,
+  );
+
+  const notificationState = useSyncExternalStore(
+    emptySubscribe,
+    getNotificationState,
+    (): NotificationState => "default",
+  );
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -233,6 +271,42 @@ export default function GananciasModule() {
     }
   }, [mes]);
 
+  const fetchSummary = useCallback(async () => {
+    if (!summaryDate) {
+      setSummaryRecords([]);
+      return;
+    }
+    try {
+      setSummaryLoading(true);
+      const res = await fetch(`/api/academix?fecha=${summaryDate}`);
+      if (!res.ok) throw new Error();
+      const data: AcademixListResponse = await res.json();
+      setSummaryRecords(data.records);
+      setSummaryError(null);
+    } catch {
+      setSummaryRecords([]);
+      setSummaryError("Error al cargar los trabajos del día");
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, [summaryDate]);
+
+  const notifyIfThereAreWorks = useCallback(async () => {
+    const today = getTodayIso();
+    if (getLastNotificationDate() === today) return false;
+    try {
+      const res = await fetch(`/api/academix?fecha=${today}`);
+      if (!res.ok) return false;
+      const data: AcademixListResponse = await res.json();
+      if (data.records.length === 0) return false;
+      const notified = showWorkNotification("hoy", data.records);
+      if (notified) setLastNotificationDate(today);
+      return notified;
+    } catch {
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       void fetchData();
@@ -240,8 +314,74 @@ export default function GananciasModule() {
     return () => clearTimeout(timer);
   }, [fetchData]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void fetchSummary();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchSummary]);
+
+  useEffect(() => {
+    if (notificationState !== "granted") return;
+
+    let timer: number | undefined;
+    const schedule = () => {
+      timer = window.setTimeout(() => {
+        void notifyIfThereAreWorks();
+        schedule();
+      }, getNextReminderDelay());
+    };
+
+    if (isReminderTimePassed()) {
+      void notifyIfThereAreWorks();
+    }
+    schedule();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && isReminderTimePassed()) {
+        void notifyIfThereAreWorks();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [notificationState, notifyIfThereAreWorks]);
+
+  async function handleEnableNotifications() {
+    setNotificationMessage(null);
+    const state = await requestNotificationPermission();
+    if (state === "granted") {
+      setNotificationMessage("Recordatorio activado");
+      void notifyIfThereAreWorks();
+    } else if (state === "denied") {
+      setNotificationMessage(
+        "Permite las notificaciones en los ajustes del navegador",
+      );
+    } else if (state === "unsupported") {
+      setNotificationMessage(
+        "Las notificaciones no están disponibles en este navegador",
+      );
+    }
+  }
+
+  function closeDetail() {
+    setDetailRecord(null);
+  }
+
   const monthOptions = Array.from(
     new Set([currentMonth, ...data.months].filter(Boolean)),
+  );
+
+  const summaryPorcentajeTotal = summaryRecords.reduce(
+    (total, record) => total + Number(record.porcentaje ?? 0),
+    0,
+  );
+  const summaryPriceTotal = summaryRecords.reduce(
+    (total, record) => total + Number(record.precio ?? 0),
+    0,
   );
 
   const cards = [
@@ -315,6 +455,134 @@ export default function GananciasModule() {
         ))}
       </section>
 
+      <section className="mt-8 rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="text-base font-bold text-primary">Resumen del día</h2>
+            <p className="mt-1 text-xs font-normal text-muted">
+              Trabajos con fecha de entrega en el día seleccionado.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="w-full sm:w-48">
+              <label htmlFor="summary-fecha" className={labelClass}>
+                Fecha
+              </label>
+              <input
+                id="summary-fecha"
+                type="date"
+                value={summaryDate}
+                onChange={(event) =>
+                  setSummaryFecha(event.target.value || undefined)
+                }
+                className={inputClass}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setSummaryFecha(undefined)}
+              className="w-full rounded-xl border border-primary/15 px-4 py-2.5 text-sm font-bold text-primary transition-colors hover:bg-surface sm:w-auto"
+            >
+              Hoy
+            </button>
+          </div>
+        </div>
+
+        <ul
+          className={`mt-4 divide-y divide-black/5 ${
+            summaryLoading ? "opacity-50" : ""
+          }`}
+        >
+          {summaryError ? (
+            <li className="px-2 py-4 text-center text-sm font-normal text-red-600">
+              {summaryError}
+            </li>
+          ) : summaryRecords.length === 0 && !summaryLoading ? (
+            <li className="px-2 py-4 text-center text-sm font-normal text-muted">
+              No hay trabajos para este día
+            </li>
+          ) : (
+            summaryRecords.map((record) => {
+              const estado = formatStatus(record.estado);
+              return (
+                <li key={record.id}>
+                  <button
+                    type="button"
+                    onClick={() => setDetailRecord(record)}
+                    className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-surface/60"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-primary">
+                        {record.hora && (
+                          <span className="mr-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
+                            {record.hora}
+                          </span>
+                        )}
+                        {record.titulo}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs font-normal text-muted">
+                        {record.codigo || "Sin código"} ·{" "}
+                        {formatDeliveryDate(record.fecha_entrega_real)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-primary">
+                          {formatCurrency(Number(record.precio ?? 0))}
+                        </p>
+                        <p className="text-xs font-normal text-muted">
+                          {formatCurrency(Number(record.porcentaje ?? 0))}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-bold ${estado.className}`}
+                      >
+                        {estado.label}
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              );
+            })
+          )}
+        </ul>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-black/5 pt-3">
+          <p className="text-sm font-normal text-muted">
+            {summaryRecords.length}{" "}
+            {summaryRecords.length === 1 ? "trabajo" : "trabajos"} · Precio{" "}
+            <span className="font-bold text-primary">
+              {formatCurrency(summaryPriceTotal)}
+            </span>{" "}
+            · Porcentaje{" "}
+            <span className="font-bold text-secondary">
+              {formatCurrency(summaryPorcentajeTotal)}
+            </span>
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {notificationMessage && (
+              <p className="text-xs font-normal text-muted">
+                {notificationMessage}
+              </p>
+            )}
+            {notificationState === "granted" ? (
+              <span className="rounded-full bg-secondary/10 px-4 py-2 text-xs font-bold text-secondary">
+                Aviso diario activado · 8:00 AM
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void handleEnableNotifications()}
+                disabled={notificationState === "unsupported"}
+                className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Activar aviso a las 8:00 AM
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
       <section
         className={`mt-8 grid gap-4 transition-opacity lg:grid-cols-2 ${
           loading ? "opacity-50" : ""
@@ -350,6 +618,8 @@ export default function GananciasModule() {
           />
         </article>
       </section>
+
+      <RecordDetailModal record={detailRecord} onClose={closeDetail} />
     </div>
   );
 }

@@ -39,6 +39,24 @@ export function getEmptyValue(): string {
   return "";
 }
 
+export function formatStatus(value: string | null): {
+  label: string;
+  className: string;
+} {
+  if (!value) {
+    return { label: "—", className: "bg-surface text-muted" };
+  }
+  const normalized = value.toLowerCase();
+  const label = value.charAt(0).toUpperCase() + value.slice(1);
+  if (normalized === "listo") {
+    return { label, className: "bg-secondary/10 text-secondary" };
+  }
+  if (normalized === "pendiente") {
+    return { label, className: "bg-accent/20 text-primary" };
+  }
+  return { label, className: "bg-primary/10 text-primary" };
+}
+
 const SPANISH_WEEKDAYS = [
   "domingo",
   "lunes",

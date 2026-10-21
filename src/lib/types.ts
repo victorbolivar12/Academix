@@ -3,6 +3,8 @@ export interface AcademixRecord {
   codigo: string | null;
   titulo: string | null;
   fecha_entrega_real: string | null;
+  hora: string | null;
+  comentario: string | null;
   precio: string | null;
   porcentaje: string | null;
   estado: string | null;

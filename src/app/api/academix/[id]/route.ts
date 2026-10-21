@@ -30,13 +30,15 @@ export async function PUT(
     const { value } = parsed;
     const result = await dbExecute(
       `UPDATE registros_trabajos
-       SET codigo = ?, titulo = ?, fecha_entrega_real = ?, precio = ?,
-           porcentaje = ?, estado = ?, estado_pago = ?
+       SET codigo = ?, titulo = ?, fecha_entrega_real = ?, hora = ?, comentario = ?,
+           precio = ?, porcentaje = ?, estado = ?, estado_pago = ?
        WHERE id = ?`,
       [
         value.codigo,
         value.titulo,
         value.fecha_entrega_real,
+        value.hora,
+        value.comentario,
         value.precio,
         value.precio * 0.75,
         value.estado,
