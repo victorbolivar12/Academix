@@ -88,6 +88,13 @@ const moduleCards = [
       "Administra los registros de Sidor y mantén todo organizado.",
     accent: "bg-primary",
   },
+  {
+    title: "Mercado",
+    href: "/dashboard/mercado",
+    description:
+      "Arma tu lista, compara precios por tienda y controla tu presupuesto.",
+    accent: "bg-secondary",
+  },
 ];
 
 export default function DashboardPage() {

@@ -1,6 +1,7 @@
 import {
   createPool,
   type Pool,
+  type PoolConnection,
   type ResultSetHeader,
   type RowDataPacket,
 } from "mysql2/promise";
@@ -50,4 +51,21 @@ export async function dbExecute(
 ): Promise<ResultSetHeader> {
   const [result] = await dbPool.execute<ResultSetHeader>(sql, params);
   return result;
+}
+
+export async function dbTransaction<T>(
+  callback: (connection: PoolConnection) => Promise<T>,
+): Promise<T> {
+  const connection = await dbPool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const result = await callback(connection);
+    await connection.commit();
+    return result;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }

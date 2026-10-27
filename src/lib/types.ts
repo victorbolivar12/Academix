@@ -53,3 +53,86 @@ export interface GananciasResponse {
   series: GananciasMonth[];
   selected: GananciasMonth;
 }
+
+export interface MercadoCategoria {
+  id: number;
+  nombre: string;
+}
+
+export interface MercadoTienda {
+  id: number;
+  nombre: string;
+}
+
+export interface MercadoPrecio {
+  id: number;
+  producto_id: number;
+  tienda_id: number | null;
+  tienda_nombre: string | null;
+  precio: number;
+  actualizado_en: string;
+}
+
+export interface MercadoProducto {
+  id: number;
+  nombre: string;
+  categoria_id: number;
+  categoria_nombre: string;
+  unidad: string;
+  activo: boolean;
+  precios: MercadoPrecio[];
+}
+
+export interface MercadoCatalogoResponse {
+  categorias: MercadoCategoria[];
+  tiendas: MercadoTienda[];
+  productos: MercadoProducto[];
+}
+
+export interface MercadoPago {
+  id: number;
+  tipo: string;
+  porcentaje: number | null;
+  monto: number;
+  fecha_pago: string;
+  fecha_vencimiento: string | null;
+}
+
+export interface MercadoListaItem {
+  id: number;
+  producto_id: number | null;
+  nombre_producto: string;
+  tienda_id: number | null;
+  tienda_nombre: string | null;
+  precio_unitario: number;
+  cantidad: number;
+  unidad: string;
+  subtotal: number;
+}
+
+export type MercadoPaymentStatus =
+  | "pagado"
+  | "pendiente"
+  | "cachea"
+  | "vencido";
+
+export interface MercadoLista {
+  id: number;
+  nombre: string;
+  estado: string;
+  presupuesto: number | null;
+  total: number;
+  pagado: number;
+  saldo: number;
+  diferencia: number | null;
+  estado_pago: MercadoPaymentStatus;
+  fecha_vencimiento: string | null;
+  created_at: string;
+  updated_at: string;
+  pagos: MercadoPago[];
+  items: MercadoListaItem[];
+}
+
+export interface MercadoListasResponse {
+  listas: MercadoLista[];
+}
