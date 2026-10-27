@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { dbExecute, dbQuery, type DbParam } from "@/lib/db";
+import type { RowDataPacket } from "mysql2/promise";
+import { dbExecute, withConnection, type DbParam } from "@/lib/db";
 import { buildMesCondition } from "@/lib/academix";
 import { getMonthIndex, parseSidorInput } from "@/lib/sidor";
 import type { SidorListResponse, SidorPago } from "@/lib/types";
@@ -25,17 +26,39 @@ export async function GET(request: Request) {
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    const records = await dbQuery<SidorPago>(
-      `SELECT id, titulo, monto, mes, fecha_pago
-       FROM pagos_sidor
-       ${where}
-       ORDER BY fecha_pago DESC, id DESC`,
-      params,
+    const { records, monthRows, summaryRows } = await withConnection(
+      async (conn) => {
+        const [recordsResult] = await conn.execute<RowDataPacket[]>(
+          `SELECT id, titulo, monto, mes, fecha_pago
+           FROM pagos_sidor
+           ${where}
+           ORDER BY fecha_pago DESC, id DESC`,
+          params,
+        );
+
+        const [monthsResult] = await conn.execute<RowDataPacket[]>(
+          "SELECT DISTINCT mes FROM pagos_sidor",
+        );
+
+        const [summaryResult] = await conn.execute<RowDataPacket[]>(
+          `SELECT COUNT(*) AS total,
+                  COALESCE(SUM(monto), 0) AS monthTotal
+           FROM pagos_sidor
+           ${mesCondition.clause ? `WHERE ${mesCondition.clause}` : ""}`,
+          mesCondition.params,
+        );
+
+        return {
+          records: recordsResult as unknown as SidorPago[],
+          monthRows: monthsResult as unknown as Array<{ mes: string }>,
+          summaryRows: summaryResult as unknown as Array<{
+            total: number;
+            monthTotal: string | null;
+          }>,
+        };
+      },
     );
 
-    const monthRows = await dbQuery<{ mes: string }>(
-      "SELECT DISTINCT mes FROM pagos_sidor",
-    );
     const months = monthRows
       .map((row) => row.mes)
       .filter(Boolean)
@@ -47,14 +70,6 @@ export async function GET(request: Request) {
         if (indexB === -1) return -1;
         return indexA - indexB;
       });
-
-    const summaryRows = await dbQuery<{ total: number; monthTotal: string | null }>(
-      `SELECT COUNT(*) AS total,
-              COALESCE(SUM(monto), 0) AS monthTotal
-       FROM pagos_sidor
-       ${mesCondition.clause ? `WHERE ${mesCondition.clause}` : ""}`,
-      mesCondition.params,
-    );
 
     const response: SidorListResponse = {
       records,

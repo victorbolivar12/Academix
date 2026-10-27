@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { dbExecute } from "@/lib/db";
+import type { ResultSetHeader } from "mysql2/promise";
+import { dbExecute, dbTransaction } from "@/lib/db";
 import { isMysqlError, parseProductoInput } from "@/lib/mercado";
 
 function parseId(id: string): number | null {
@@ -28,6 +29,65 @@ export async function PUT(
     }
 
     const { value } = parsed;
+
+    if (value.precios !== undefined) {
+      // Actualizar producto y sincronizar precios de forma atómica en 1 sola transacción
+      const notFound = await dbTransaction(async (connection) => {
+        const [result] = await connection.execute<ResultSetHeader>(
+          `UPDATE mercado_productos
+           SET nombre = ?, categoria_id = ?, unidad = ?, activo = ?
+           WHERE id = ?`,
+          [
+            value.nombre,
+            value.categoria_id,
+            value.unidad,
+            value.activo,
+            productId,
+          ],
+        );
+
+        if (result.affectedRows === 0) {
+          // Verificar si realmente no existe
+          const [check] = await connection.execute(
+            "SELECT id FROM mercado_productos WHERE id = ?",
+            [productId],
+          );
+          if ((check as unknown[]).length === 0) {
+            return true;
+          }
+        }
+
+        // Reemplazar precios
+        await connection.execute(
+          "DELETE FROM mercado_precios WHERE producto_id = ?",
+          [productId],
+        );
+
+        if (value.precios && value.precios.length > 0) {
+          const priceValues = value.precios.map((p) => [
+            productId,
+            p.tienda_id,
+            p.precio,
+          ]);
+          await connection.query(
+            "INSERT INTO mercado_precios (producto_id, tienda_id, precio) VALUES ?",
+            [priceValues],
+          );
+        }
+
+        return false;
+      });
+
+      if (notFound) {
+        return NextResponse.json(
+          { error: "Producto no encontrado" },
+          { status: 404 },
+        );
+      }
+
+      return NextResponse.json({ ok: true });
+    }
+
     const result = await dbExecute(
       `UPDATE mercado_productos
        SET nombre = ?, categoria_id = ?, unidad = ?, activo = ?
@@ -52,7 +112,7 @@ export async function PUT(
     }
     if (isMysqlError(error, "ER_NO_REFERENCED_ROW_2")) {
       return NextResponse.json(
-        { error: "La categoría seleccionada no existe" },
+        { error: "La categoría o tienda seleccionada no existe" },
         { status: 400 },
       );
     }

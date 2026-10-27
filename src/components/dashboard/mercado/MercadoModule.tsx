@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import type {
   MercadoCatalogoResponse,
   MercadoLista,
-  MercadoListasResponse,
 } from "@/lib/types";
 import MercadoCatalogosTab from "./MercadoCatalogosTab";
 import MercadoListaTab from "./MercadoListaTab";
@@ -36,22 +35,23 @@ export default function MercadoModule() {
 
   const refresh = useCallback(async () => {
     try {
-      const [catalogoResponse, listasResponse] = await Promise.all([
-        fetch("/api/mercado"),
-        fetch("/api/mercado/listas"),
-      ]);
+      const response = await fetch("/api/mercado");
 
-      if (!catalogoResponse.ok || !listasResponse.ok) {
+      if (!response.ok) {
         throw new Error();
       }
 
-      const catalogoData =
-        (await catalogoResponse.json()) as MercadoCatalogoResponse;
-      const listasData =
-        (await listasResponse.json()) as MercadoListasResponse;
+      const data = (await response.json()) as MercadoCatalogoResponse;
 
-      setCatalogo(catalogoData);
-      setListas(listasData.listas);
+      setCatalogo({
+        categorias: data.categorias,
+        tiendas: data.tiendas,
+        productos: data.productos,
+      });
+
+      if (data.listas) {
+        setListas(data.listas);
+      }
       setError(null);
     } catch {
       setError("Error al cargar la información de Mercado");

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { dbExecute, dbQuery, type DbParam } from "@/lib/db";
+import type { RowDataPacket } from "mysql2/promise";
+import { dbExecute, withConnection, type DbParam } from "@/lib/db";
 import { buildMesCondition, parseRecordInput } from "@/lib/academix";
 import type {
   AcademixListResponse,
@@ -52,41 +53,53 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const { where, params } = buildConditions(searchParams);
 
-    const records = await dbQuery<AcademixRecord>(
-      `SELECT id, codigo, titulo, fecha_entrega_real, hora, comentario, precio,
-              porcentaje, estado, estado_pago, mes_registro
-       FROM registros_trabajos
-       ${where}
-       ORDER BY fecha_entrega_real DESC, id DESC`,
-      params,
-    );
-
-    const months = await dbQuery<{ mes_registro: string }>(
-      `SELECT DISTINCT mes_registro
-       FROM registros_trabajos
-       ORDER BY mes_registro DESC`,
-    );
-
     const mesCondition = buildMesCondition(searchParams.get("mes"));
-    const monthCountRows = await dbQuery<{ total: number }>(
-      `SELECT COUNT(*) AS total
-       FROM registros_trabajos
-       ${mesCondition.clause ? `WHERE ${mesCondition.clause}` : ""}`,
-      mesCondition.params,
-    );
-    const monthCount = Number(monthCountRows[0]?.total ?? 0);
 
-    const statsRows = await dbQuery<StatsRow>(
-      `SELECT
-         COALESCE(SUM(CASE WHEN estado = 'listo' AND estado_pago = 'pendiente' THEN precio END), 0) AS acumulado,
-         COALESCE(SUM(CASE WHEN estado = 'listo' AND estado_pago = 'listo' THEN precio END), 0) AS totalAcademia
-       FROM registros_trabajos
-       ${where}`,
-      params,
-    );
+    const { records, months, monthCount, acumulado, totalAcademia } =
+      await withConnection(async (conn) => {
+        const [recordsResult] = await conn.execute<RowDataPacket[]>(
+          `SELECT id, codigo, titulo, fecha_entrega_real, hora, comentario, precio,
+                  porcentaje, estado, estado_pago, mes_registro
+           FROM registros_trabajos
+           ${where}
+           ORDER BY fecha_entrega_real DESC, id DESC`,
+          params,
+        );
 
-    const acumulado = Number(statsRows[0]?.acumulado ?? 0);
-    const totalAcademia = Number(statsRows[0]?.totalAcademia ?? 0);
+        const [monthsResult] = await conn.execute<RowDataPacket[]>(
+          `SELECT DISTINCT mes_registro
+           FROM registros_trabajos
+           ORDER BY mes_registro DESC`,
+        );
+
+        const [monthCountResult] = await conn.execute<RowDataPacket[]>(
+          `SELECT COUNT(*) AS total
+           FROM registros_trabajos
+           ${mesCondition.clause ? `WHERE ${mesCondition.clause}` : ""}`,
+          mesCondition.params,
+        );
+
+        const [statsResult] = await conn.execute<RowDataPacket[]>(
+          `SELECT
+             COALESCE(SUM(CASE WHEN estado = 'listo' AND estado_pago = 'pendiente' THEN precio END), 0) AS acumulado,
+             COALESCE(SUM(CASE WHEN estado = 'listo' AND estado_pago = 'listo' THEN precio END), 0) AS totalAcademia
+           FROM registros_trabajos
+           ${where}`,
+          params,
+        );
+
+        const statsRow = statsResult[0] as unknown as StatsRow | undefined;
+
+        return {
+          records: recordsResult as unknown as AcademixRecord[],
+          months: monthsResult as unknown as Array<{ mes_registro: string }>,
+          monthCount: Number(
+            (monthCountResult[0] as unknown as { total: number })?.total ?? 0,
+          ),
+          acumulado: Number(statsRow?.acumulado ?? 0),
+          totalAcademia: Number(statsRow?.totalAcademia ?? 0),
+        };
+      });
 
     const stats: AcademixStats = {
       acumulado,

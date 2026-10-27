@@ -1,4 +1,5 @@
-import { dbQuery } from "@/lib/db";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { withConnection } from "@/lib/db";
 import { buildListSummary, roundMoney } from "@/lib/mercado";
 import type {
   MercadoLista,
@@ -95,28 +96,33 @@ function buildList(
   };
 }
 
-export async function fetchMercadoListas(): Promise<MercadoLista[]> {
-  const listRows = await dbQuery<ListaRow>(
+async function queryListas(
+  conn: PoolConnection,
+): Promise<MercadoLista[]> {
+  const [listRowsResult] = await conn.execute<RowDataPacket[]>(
     `SELECT id, nombre, estado, presupuesto, total, created_at, updated_at
      FROM mercado_listas
      ORDER BY created_at DESC, id DESC`,
   );
+  const listRows = listRowsResult as unknown as ListaRow[];
 
   if (listRows.length === 0) return [];
 
-  const [itemRows, pagoRows] = await Promise.all([
-    dbQuery<ItemRow>(
-      `SELECT id, lista_id, producto_id, nombre_producto, tienda_id,
-              tienda_nombre, precio_unitario, cantidad, unidad
-       FROM mercado_lista_items
-       ORDER BY id ASC`,
-    ),
-    dbQuery<PagoRow>(
-      `SELECT id, lista_id, tipo, porcentaje, monto, fecha_pago, fecha_vencimiento
-       FROM mercado_pagos
-       ORDER BY fecha_pago ASC, id ASC`,
-    ),
-  ]);
+  // Ejecución secuencial en la misma conexión para evitar abrir conexiones simultáneas
+  const [itemResult] = await conn.execute<RowDataPacket[]>(
+    `SELECT id, lista_id, producto_id, nombre_producto, tienda_id,
+            tienda_nombre, precio_unitario, cantidad, unidad
+     FROM mercado_lista_items
+     ORDER BY id ASC`,
+  );
+  const itemRows = itemResult as unknown as ItemRow[];
+
+  const [pagoResult] = await conn.execute<RowDataPacket[]>(
+    `SELECT id, lista_id, tipo, porcentaje, monto, fecha_pago, fecha_vencimiento
+     FROM mercado_pagos
+     ORDER BY fecha_pago ASC, id ASC`,
+  );
+  const pagoRows = pagoResult as unknown as PagoRow[];
 
   const itemsByList = new Map<number, ItemRow[]>();
   for (const item of itemRows) {
@@ -141,35 +147,57 @@ export async function fetchMercadoListas(): Promise<MercadoLista[]> {
   );
 }
 
-export async function fetchMercadoLista(
+export async function fetchMercadoListas(
+  connection?: PoolConnection,
+): Promise<MercadoLista[]> {
+  if (connection) {
+    return queryListas(connection);
+  }
+  return withConnection(queryListas);
+}
+
+async function queryLista(
+  conn: PoolConnection,
   listId: number,
 ): Promise<MercadoLista | null> {
-  const listRows = await dbQuery<ListaRow>(
+  const [listRowsResult] = await conn.execute<RowDataPacket[]>(
     `SELECT id, nombre, estado, presupuesto, total, created_at, updated_at
      FROM mercado_listas
      WHERE id = ?`,
     [listId],
   );
+  const listRows = listRowsResult as unknown as ListaRow[];
 
   if (listRows.length === 0) return null;
 
-  const [itemRows, pagoRows] = await Promise.all([
-    dbQuery<ItemRow>(
-      `SELECT id, lista_id, producto_id, nombre_producto, tienda_id,
-              tienda_nombre, precio_unitario, cantidad, unidad
-       FROM mercado_lista_items
-       WHERE lista_id = ?
-       ORDER BY id ASC`,
-      [listId],
-    ),
-    dbQuery<PagoRow>(
-      `SELECT id, lista_id, tipo, porcentaje, monto, fecha_pago, fecha_vencimiento
-       FROM mercado_pagos
-       WHERE lista_id = ?
-       ORDER BY fecha_pago ASC, id ASC`,
-      [listId],
-    ),
-  ]);
+  const [itemResult] = await conn.execute<RowDataPacket[]>(
+    `SELECT id, lista_id, producto_id, nombre_producto, tienda_id,
+            tienda_nombre, precio_unitario, cantidad, unidad
+     FROM mercado_lista_items
+     WHERE lista_id = ?
+     ORDER BY id ASC`,
+    [listId],
+  );
+  const itemRows = itemResult as unknown as ItemRow[];
+
+  const [pagoResult] = await conn.execute<RowDataPacket[]>(
+    `SELECT id, lista_id, tipo, porcentaje, monto, fecha_pago, fecha_vencimiento
+     FROM mercado_pagos
+     WHERE lista_id = ?
+     ORDER BY fecha_pago ASC, id ASC`,
+    [listId],
+  );
+  const pagoRows = pagoResult as unknown as PagoRow[];
 
   return buildList(listRows[0], itemRows, pagoRows);
+}
+
+export async function fetchMercadoLista(
+  listId: number,
+  connection?: PoolConnection,
+): Promise<MercadoLista | null> {
+  if (connection) {
+    return queryLista(connection, listId);
+  }
+  return withConnection((conn) => queryLista(conn, listId));
 }

@@ -53,6 +53,59 @@ export async function POST(request: Request) {
     }
 
     const listId = await dbTransaction(async (connection) => {
+      // 1. Validar productos en lote con una sola consulta
+      const productIds = Array.from(
+        new Set(value.items.map((i) => i.producto_id)),
+      );
+      const [productRows] = await connection.query<RowDataPacket[]>(
+        "SELECT id, nombre, unidad FROM mercado_productos WHERE id IN (?)",
+        [productIds],
+      );
+      const productMap = new Map<number, { nombre: string; unidad: string }>();
+      for (const row of productRows as Array<{
+        id: number;
+        nombre: string;
+        unidad: string;
+      }>) {
+        productMap.set(row.id, { nombre: row.nombre, unidad: row.unidad });
+      }
+
+      for (const item of value.items) {
+        if (!productMap.has(item.producto_id)) {
+          throw new ValidationError(
+            "Uno de los productos seleccionados ya no existe",
+          );
+        }
+      }
+
+      // 2. Validar tiendas en lote con una sola consulta
+      const storeIds = Array.from(
+        new Set(
+          value.items
+            .map((i) => i.tienda_id)
+            .filter((id): id is number => id !== null),
+        ),
+      );
+      const storeMap = new Map<number, string>();
+      if (storeIds.length > 0) {
+        const [storeRows] = await connection.query<RowDataPacket[]>(
+          "SELECT id, nombre FROM mercado_tiendas WHERE id IN (?)",
+          [storeIds],
+        );
+        for (const row of storeRows as Array<{ id: number; nombre: string }>) {
+          storeMap.set(row.id, row.nombre);
+        }
+
+        for (const item of value.items) {
+          if (item.tienda_id !== null && !storeMap.has(item.tienda_id)) {
+            throw new ValidationError(
+              "Una de las tiendas seleccionadas ya no existe",
+            );
+          }
+        }
+      }
+
+      // 3. Insertar la lista
       const [listResult] = await connection.execute(
         `INSERT INTO mercado_listas (nombre, estado, presupuesto, total)
          VALUES (?, 'pendiente', ?, ?)`,
@@ -61,51 +114,30 @@ export async function POST(request: Request) {
 
       const insertId = (listResult as { insertId: number }).insertId;
 
-      for (const item of value.items) {
-        const [rows] = await connection.execute<RowDataPacket[]>(
-          `SELECT p.nombre, p.unidad
-           FROM mercado_productos p
-           WHERE p.id = ?`,
-          [item.producto_id],
-        );
-        if (rows.length === 0) {
-          throw new ValidationError(
-            "Uno de los productos seleccionados ya no existe",
-          );
-        }
+      // 4. Inserción de todos los items en lote con una sola consulta
+      const itemValues = value.items.map((item) => {
+        const product = productMap.get(item.producto_id)!;
+        const storeName =
+          item.tienda_id !== null ? (storeMap.get(item.tienda_id) ?? null) : null;
+        return [
+          insertId,
+          item.producto_id,
+          product.nombre,
+          item.tienda_id,
+          storeName,
+          item.precio_unitario,
+          item.cantidad,
+          product.unidad,
+        ];
+      });
 
-        const product = rows[0] as { nombre: string; unidad: string };
-        let storeName: string | null = null;
-        if (item.tienda_id !== null) {
-          const [storeRows] = await connection.execute<RowDataPacket[]>(
-            "SELECT nombre FROM mercado_tiendas WHERE id = ?",
-            [item.tienda_id],
-          );
-          if (storeRows.length === 0) {
-            throw new ValidationError(
-              "Una de las tiendas seleccionadas ya no existe",
-            );
-          }
-          storeName = (storeRows[0] as { nombre: string }).nombre;
-        }
-
-        await connection.execute(
-          `INSERT INTO mercado_lista_items
-             (lista_id, producto_id, nombre_producto, tienda_id, tienda_nombre,
-              precio_unitario, cantidad, unidad)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            insertId,
-            item.producto_id,
-            product.nombre,
-            item.tienda_id,
-            storeName,
-            item.precio_unitario,
-            item.cantidad,
-            product.unidad,
-          ],
-        );
-      }
+      await connection.query(
+        `INSERT INTO mercado_lista_items
+           (lista_id, producto_id, nombre_producto, tienda_id, tienda_nombre,
+            precio_unitario, cantidad, unidad)
+         VALUES ?`,
+        [itemValues],
+      );
 
       if (parsedPago?.ok) {
         const pago = parsedPago.value;

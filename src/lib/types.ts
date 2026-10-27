@@ -87,6 +87,7 @@ export interface MercadoCatalogoResponse {
   categorias: MercadoCategoria[];
   tiendas: MercadoTienda[];
   productos: MercadoProducto[];
+  listas?: MercadoLista[];
 }
 
 export interface MercadoPago {

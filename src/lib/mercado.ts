@@ -34,6 +34,7 @@ export interface ProductoInput {
   categoria_id: number;
   unidad: string;
   activo: boolean;
+  precios?: PrecioInput[];
 }
 
 export interface PrecioInput {
@@ -162,6 +163,52 @@ export function parseProductoInput(body: unknown): ParseResult<ProductoInput> {
     return { ok: false, error: "Selecciona una unidad válida" };
   }
 
+  let precios: PrecioInput[] | undefined;
+  if ("precios" in data && Array.isArray(data.precios)) {
+    precios = [];
+    const seenStores = new Set<string>();
+    for (const rawPrice of data.precios) {
+      if (typeof rawPrice !== "object" || rawPrice === null) {
+        return { ok: false, error: "Hay un precio no válido" };
+      }
+      const p = rawPrice as Record<string, unknown>;
+      const rawStoreId = p.tienda_id;
+      const tiendaId =
+        rawStoreId === null || rawStoreId === undefined || rawStoreId === ""
+          ? null
+          : rawStoreId;
+
+      if (tiendaId !== null && !isPositiveInteger(tiendaId)) {
+        return { ok: false, error: "Selecciona una tienda válida en los precios" };
+      }
+
+      const storeKey = tiendaId === null ? "__none__" : String(tiendaId);
+      if (seenStores.has(storeKey)) {
+        return {
+          ok: false,
+          error:
+            tiendaId === null
+              ? "Solo puede haber un precio sin tienda"
+              : "No repitas la misma tienda en los precios",
+        };
+      }
+      seenStores.add(storeKey);
+
+      const precio = Number(p.precio);
+      if (!Number.isFinite(precio) || precio < 0) {
+        return {
+          ok: false,
+          error: "Cada precio debe ser un número válido mayor o igual a 0",
+        };
+      }
+
+      precios.push({
+        tienda_id: tiendaId,
+        precio: roundMoney(precio),
+      });
+    }
+  }
+
   return {
     ok: true,
     value: {
@@ -169,6 +216,7 @@ export function parseProductoInput(body: unknown): ParseResult<ProductoInput> {
       categoria_id: data.categoria_id,
       unidad,
       activo: data.activo === undefined ? true : Boolean(data.activo),
+      ...(precios !== undefined ? { precios } : {}),
     },
   };
 }

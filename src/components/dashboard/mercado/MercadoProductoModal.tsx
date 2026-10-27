@@ -67,7 +67,6 @@ export default function MercadoProductoModal({
         }))
       : [],
   );
-  const [deletedPriceIds, setDeletedPriceIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,7 +85,6 @@ export default function MercadoProductoModal({
 
   function updateRowStore(row: PriceRow, storeId: string) {
     if (row.id !== null && row.tienda_id !== storeId) {
-      setDeletedPriceIds((current) => [...current, row.id as number]);
       setPriceRows((current) =>
         current.map((item) =>
           item.key === row.key
@@ -100,9 +98,6 @@ export default function MercadoProductoModal({
   }
 
   function removeRow(row: PriceRow) {
-    if (row.id !== null) {
-      setDeletedPriceIds((current) => [...current, row.id as number]);
-    }
     setPriceRows((current) => current.filter((item) => item.key !== row.key));
   }
 
@@ -147,6 +142,11 @@ export default function MercadoProductoModal({
 
     setSaving(true);
     try {
+      const formattedPrecios = rowsToSave.map((row) => ({
+        tienda_id: row.tienda_id === "" ? null : Number(row.tienda_id),
+        precio: Number(row.precio),
+      }));
+
       const isEditing = product !== null;
       const response = await fetch(
         product ? `/api/mercado/productos/${product.id}` : "/api/mercado/productos",
@@ -158,6 +158,7 @@ export default function MercadoProductoModal({
             categoria_id: Number(categoriaId),
             unidad,
             activo: true,
+            precios: formattedPrecios,
           }),
         },
       );
@@ -167,45 +168,6 @@ export default function MercadoProductoModal({
       };
       if (!response.ok) {
         throw new Error(data.error ?? "Error al guardar el producto");
-      }
-
-      const productId = product ? product.id : data.id;
-      if (!productId) {
-        throw new Error("Error al guardar el producto");
-      }
-
-      for (const priceId of deletedPriceIds) {
-        const deleteResponse = await fetch(`/api/mercado/precios/${priceId}`, {
-          method: "DELETE",
-        });
-        if (!deleteResponse.ok) {
-          const deleteData = (await deleteResponse.json()) as {
-            error?: string;
-          };
-          throw new Error(
-            deleteData.error ?? "Error al eliminar un precio del producto",
-          );
-        }
-      }
-
-      for (const row of rowsToSave) {
-        const priceResponse = await fetch(
-          `/api/mercado/productos/${productId}/precios`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              tienda_id: row.tienda_id === "" ? null : Number(row.tienda_id),
-              precio: Number(row.precio),
-            }),
-          },
-        );
-        if (!priceResponse.ok) {
-          const priceData = (await priceResponse.json()) as { error?: string };
-          throw new Error(
-            priceData.error ?? "Error al guardar uno de los precios",
-          );
-        }
       }
 
       await onSaved();

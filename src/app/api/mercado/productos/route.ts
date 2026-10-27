@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { dbExecute, dbQuery, type DbParam } from "@/lib/db";
+import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { dbExecute, dbTransaction, withConnection, type DbParam } from "@/lib/db";
 import { isMysqlError, parseProductoInput } from "@/lib/mercado";
 import type { MercadoPrecio, MercadoProducto } from "@/lib/types";
 
@@ -42,8 +43,8 @@ export async function GET(request: Request) {
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    const [productRows, priceRows] = await Promise.all([
-      dbQuery<ProductRow>(
+    const { productRows, priceRows } = await withConnection(async (conn) => {
+      const [prodRows] = await conn.execute<RowDataPacket[]>(
         `SELECT p.id, p.nombre, p.categoria_id, c.nombre AS categoria_nombre,
                 p.unidad, p.activo
          FROM mercado_productos p
@@ -51,15 +52,21 @@ export async function GET(request: Request) {
          ${where}
          ORDER BY p.nombre ASC`,
         params,
-      ),
-      dbQuery<PriceRow>(
+      );
+
+      const [prRows] = await conn.execute<RowDataPacket[]>(
         `SELECT pr.id, pr.producto_id, pr.tienda_id, t.nombre AS tienda_nombre,
                 pr.precio, pr.actualizado_en
          FROM mercado_precios pr
          LEFT JOIN mercado_tiendas t ON t.id = pr.tienda_id
          ORDER BY t.nombre ASC`,
-      ),
-    ]);
+      );
+
+      return {
+        productRows: prodRows as unknown as ProductRow[],
+        priceRows: prRows as unknown as PriceRow[],
+      };
+    });
 
     const pricesByProduct = new Map<number, MercadoPrecio[]>();
     for (const row of priceRows) {
@@ -105,6 +112,33 @@ export async function POST(request: Request) {
     }
 
     const { value } = parsed;
+
+    if (value.precios && value.precios.length > 0) {
+      const insertId = await dbTransaction(async (connection) => {
+        const [result] = await connection.execute<ResultSetHeader>(
+          `INSERT INTO mercado_productos (nombre, categoria_id, unidad, activo)
+           VALUES (?, ?, ?, ?)`,
+          [value.nombre, value.categoria_id, value.unidad, value.activo],
+        );
+        const productId = result.insertId;
+
+        const priceValues = value.precios!.map((p) => [
+          productId,
+          p.tienda_id,
+          p.precio,
+        ]);
+
+        await connection.query(
+          "INSERT INTO mercado_precios (producto_id, tienda_id, precio) VALUES ?",
+          [priceValues],
+        );
+
+        return productId;
+      });
+
+      return NextResponse.json({ id: insertId }, { status: 201 });
+    }
+
     const result = await dbExecute(
       `INSERT INTO mercado_productos (nombre, categoria_id, unidad, activo)
        VALUES (?, ?, ?, ?)`,
@@ -121,7 +155,7 @@ export async function POST(request: Request) {
     }
     if (isMysqlError(error, "ER_NO_REFERENCED_ROW_2")) {
       return NextResponse.json(
-        { error: "La categoría seleccionada no existe" },
+        { error: "La categoría o tienda seleccionada no existe" },
         { status: 400 },
       );
     }

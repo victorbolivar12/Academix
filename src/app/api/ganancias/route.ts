@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
+import type { RowDataPacket } from "mysql2/promise";
+import { withConnection } from "@/lib/db";
 import { normalizeMonthKey } from "@/lib/ganancias";
 import { getMonthIndex } from "@/lib/sidor";
 import type { GananciasMonth, GananciasResponse } from "@/lib/types";
@@ -14,20 +15,27 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const mesFilter = searchParams.get("mes");
 
-    const academixRows = await dbQuery<GroupRow>(
-      `SELECT mes_registro AS mes,
-              COALESCE(SUM(precio), 0) * 0.75 AS total
-       FROM registros_trabajos
-       WHERE estado = 'listo' AND estado_pago = 'listo'
-       GROUP BY mes_registro`,
-    );
+    const { academixRows, sidorRows } = await withConnection(async (conn) => {
+      const [academixResult] = await conn.execute<RowDataPacket[]>(
+        `SELECT mes_registro AS mes,
+                COALESCE(SUM(precio), 0) * 0.75 AS total
+         FROM registros_trabajos
+         WHERE estado = 'listo' AND estado_pago = 'listo'
+         GROUP BY mes_registro`,
+      );
 
-    const sidorRows = await dbQuery<GroupRow>(
-      `SELECT mes,
-              COALESCE(SUM(monto), 0) AS total
-       FROM pagos_sidor
-       GROUP BY mes`,
-    );
+      const [sidorResult] = await conn.execute<RowDataPacket[]>(
+        `SELECT mes,
+                COALESCE(SUM(monto), 0) AS total
+         FROM pagos_sidor
+         GROUP BY mes`,
+      );
+
+      return {
+        academixRows: academixResult as unknown as GroupRow[],
+        sidorRows: sidorResult as unknown as GroupRow[],
+      };
+    });
 
     const byMonth = new Map<string, { academix: number; sidor: number }>();
 

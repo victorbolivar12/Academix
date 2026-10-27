@@ -119,22 +119,24 @@ export async function PATCH(
       );
     }
 
-    const existing = await dbQuery<{ id: number }>(
-      "SELECT id FROM mercado_listas WHERE id = ?",
-      [listId],
-    );
-    if (existing.length === 0) {
-      return NextResponse.json(
-        { error: "Lista no encontrada" },
-        { status: 404 },
-      );
-    }
-
     params.push(listId);
-    await dbExecute(
+    const result = await dbExecute(
       `UPDATE mercado_listas SET ${updates.join(", ")} WHERE id = ?`,
       params,
     );
+
+    if (result.affectedRows === 0) {
+      const existing = await dbQuery<{ id: number }>(
+        "SELECT id FROM mercado_listas WHERE id = ?",
+        [listId],
+      );
+      if (existing.length === 0) {
+        return NextResponse.json(
+          { error: "Lista no encontrada" },
+          { status: 404 },
+        );
+      }
+    }
 
     return NextResponse.json({ ok: true });
   } catch {
