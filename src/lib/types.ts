@@ -137,3 +137,17 @@ export interface MercadoLista {
 export interface MercadoListasResponse {
   listas: MercadoLista[];
 }
+
+export interface MetaItem {
+  id: number;
+  nombre: string;
+  precio: number;
+  fecha_compra: string;
+  completado: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MetasResponse {
+  items: MetaItem[];
+}

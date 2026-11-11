@@ -95,6 +95,13 @@ const moduleCards = [
       "Arma tu lista, compara precios por tienda y controla tu presupuesto.",
     accent: "bg-secondary",
   },
+  {
+    title: "Meta",
+    href: "/dashboard/meta",
+    description:
+      "Anota los productos que quieres comprar y marca tus metas cumplidas.",
+    accent: "bg-accent",
+  },
 ];
 
 export default function DashboardPage() {
