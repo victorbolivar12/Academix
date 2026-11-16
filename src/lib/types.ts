@@ -151,3 +151,30 @@ export interface MetaItem {
 export interface MetasResponse {
   items: MetaItem[];
 }
+
+export type MealType = "desayuno" | "almuerzo" | "cena";
+
+export interface AlimentacionAlimento {
+  id: number;
+  nombre: string;
+  categoria: string;
+  calorias_por_100g: number;
+}
+
+export interface AlimentacionRegistro {
+  id: number;
+  fecha: string;
+  tipo_comida: MealType;
+  alimento_id: number | null;
+  nombre: string;
+  calorias_por_100g: number;
+  gramos: number;
+  calorias: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AlimentacionResponse {
+  alimentos: AlimentacionAlimento[];
+  registros: AlimentacionRegistro[];
+}

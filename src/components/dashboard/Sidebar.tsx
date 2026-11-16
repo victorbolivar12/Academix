@@ -101,6 +101,27 @@ const modules = [
       </svg>
     ),
   },
+  {
+    label: "Alimentación",
+    href: "/dashboard/alimentacion",
+    icon: (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-5 w-5"
+        aria-hidden="true"
+      >
+        <path d="M3 2v7a2 2 0 0 0 2 2 2 2 0 0 0 2-2V2" />
+        <path d="M5 11v11" />
+        <path d="M15 2c-1.5 2-2 4.5-2 7a3 3 0 0 0 3 3h1V2" />
+        <path d="M17 12v10" />
+      </svg>
+    ),
+  },
 ];
 
 interface SidebarProps {

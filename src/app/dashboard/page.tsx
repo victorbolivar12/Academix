@@ -102,6 +102,13 @@ const moduleCards = [
       "Anota los productos que quieres comprar y marca tus metas cumplidas.",
     accent: "bg-accent",
   },
+  {
+    title: "Alimentación",
+    href: "/dashboard/alimentacion",
+    description:
+      "Planifica tus comidas de la semana y controla las calorías diarias.",
+    accent: "bg-secondary",
+  },
 ];
 
 export default function DashboardPage() {
